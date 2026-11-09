@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rozliczenia</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script><script src="js/common.js"></script></head>
+<body><script>
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data.session) initPage('home', renderHome); else showLogin();
+})();
+function showLogin() {
+  const err = location.search.includes('e=1') ? '<div class="alert err">To konto nie ma jeszcze uprawnień. Skontaktuj się z administratorem.</div>' : '';
+  document.body.innerHTML = '<div class="login"><h1>Rozliczenia</h1>' + err +
+    '<label>Adres e-mail</label><input id="email" type="email" autocomplete="username">' +
+    '<label>Hasło</label><input id="password" type="password" autocomplete="current-password">' +
+    '<button id="go">Zaloguj się</button><div id="loginErr" style="margin-top:12px"></div></div>';
+  $('go').onclick = async () => {
+    const { error } = await sb.auth.signInWithPassword({ email: $('email').value.trim(), password: $('password').value });
+    if (error) $('loginErr').innerHTML = '<div class="alert err">Nieprawidłowy adres e-mail lub hasło.</div>'; else location.href = 'index.html';
+  };
+}
+function renderHome() {
+  $('content').innerHTML = '<h1>Pulpit</h1><div class="tiles">' +
+    '<a class="tile" href="evidence.html"><b>Ewidencje</b><span>Palety, godziny i inne rejestry dzień po dniu</span></a>' +
+    '<a class="tile" href="items.html"><b>Transport i refaktury</b><span>Ceny refaktur i pozycje ręczne</span></a>' +
+    '<a class="tile" href="invoice.html"><b>Faktura</b><span>Podsumowanie w GBP i EUR</span></a></div>';
+}
+</script></body></html>
