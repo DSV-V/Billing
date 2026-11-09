@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ewidencje</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script><script src="js/common.js"></script></head>
+<body><script>
+// Nowa ewidencja = nowy wpis na tej liście (nazwa usługi musi zgadzać się z tabelą services).
+const EVIDENCE = {
+  pallets: { label: 'Palety', service: PALLET_SERVICE, fields: [{ k: 'palets_in', l: 'Wjechało', step: 1 }, { k: 'palets_out', l: 'Wyjechało', step: 1 }] },
+  hours: { label: 'Godziny', service: HOURS_SERVICE, fields: [{ k: 'quantity', l: 'Liczba godzin', step: 0.25 }] }
+};
+const cur = () => (location.hash.slice(1) in EVIDENCE ? location.hash.slice(1) : 'pallets');
+window.onhashchange = () => reloadPage();
+initPage('evidence', render);
+
+async function render() {
+  const key = cur(), ev = EVIDENCE[key], p = params(), sid = serviceId(ev.service);
+  const tabs = '<div class="subtabs">' + Object.keys(EVIDENCE).map(k => '<button class="' + (k === key ? 'on' : '') + '" onclick="location.hash=\'' + k + '\'">' + EVIDENCE[k].label + '</button>').join('') + '</div>';
+  if (!sid) { $('content').innerHTML = tabs + '<div class="alert err">Nie znaleziono usługi „' + esc(ev.service) + '”.</div>'; return; }
+  const { data } = await sb.from('daily_records').select('*').eq('client_id', p.client).eq('service_id', sid).lte('record_date', p.end).order('record_date');
+  const all = data || [], month = all.filter(r => r.record_date >= p.first);
+  const sum = k => month.reduce((a, r) => a + Number(r[k] || 0), 0);
+  let stats = '<div class="stat"><small>Dni z wpisami</small><b>' + month.length + '</b></div>';
+  ev.fields.forEach(f => stats += '<div class="stat"><small>' + f.l + ' (miesiąc)</small><b>' + sum(f.k) + '</b></div>');
+  if (key === 'pallets') {
+    const t = await sb.from('tariffs').select('start_balance').eq('client_id', p.client).eq('service_id', sid).order('valid_from', { ascending: false }).limit(1);
+    const start = t.data && t.data[0] ? Number(t.data[0].start_balance) : 0;
+    const bal = start + all.reduce((a, r) => a + Number(r.palets_in) - Number(r.palets_out), 0);
+    stats += '<div class="stat total"><small>Stan na koniec miesiąca</small><b>' + bal + '</b></div>';
+  }
+  const form = '<div class="row"><div><label>Data</label><input id="fDate" type="date"></div>' +
+    ev.fields.map(f => '<div><label>' + f.l + '</label><input id="f-' + f.k + '" type="number" min="0" step="' + f.step + '" value="0" style="width:110px"></div>').join('') +
+    '<button onclick="save()">Zapisz</button></div>';
+  const rows = month.slice().reverse().map(r => '<tr><td>' + r.record_date + '</td>' + ev.fields.map(f => '<td class="num">' + r[f.k] + '</td>').join('') + '<td class="num"><button class="sec" onclick="del(' + r.id + ')">Usuń</button></td></tr>').join('');
+  $('content').innerHTML = '<h1>Ewidencje</h1>' + tabs + '<div class="split"><div class="card">' + form +
+    '<table><thead><tr><th>Data</th>' + ev.fields.map(f => '<th class="num">' + f.l + '</th>').join('') + '<th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<div class="card"><h3>Podsumowanie miesiąca</h3><div class="stats" style="grid-template-columns:1fr 1fr">' + stats + '</div></div></div>';
+  $('fDate').value = new Date().toISOString().slice(0, 10);
+}
+async function save() {
+  const ev = EVIDENCE[cur()], p = params();
+  const row = { client_id: p.client, service_id: serviceId(ev.service), record_date: $('fDate').value, zone: '' };
+  ev.fields.forEach(f => row[f.k] = parseFloat($('f-' + f.k).value) || 0);
+  const { error } = await sb.from('daily_records').upsert(row, { onConflict: 'client_id,service_id,record_date,zone' });
+  if (error) showMsg('Błąd zapisu: ' + error.message, true); else { await render(); showMsg('Zapisano.'); }
+}
+async function del(id) {
+  if (!confirm('Na pewno usunąć wpis?')) return;
+  const { error } = await sb.from('daily_records').delete().eq('id', id);
+  if (error) showMsg('Błąd: ' + error.message, true); else render();
+}
+</script></body></html>

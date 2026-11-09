@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Palety</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script><script src="js/common.js"></script></head>
+<body><script>
+initPage('pallets', render);
+async function render() {
+  const p = params(), sid = serviceId(PALLET_SERVICE);
+  if (!sid) { $('content').innerHTML = '<div class="alert err">Nie znaleziono usługi „' + PALLET_SERVICE + '”.</div>'; return; }
+  const { data } = await sb.from('daily_records').select('*').eq('client_id', p.client).eq('service_id', sid).gte('record_date', p.first).lte('record_date', p.end).order('record_date');
+  $('content').innerHTML = '<h1>Ruch palet</h1><div class="card"><div class="row">' +
+    '<div><label>Data</label><input id="pDate" type="date"></div>' +
+    '<div><label>Wjechało</label><input id="pIn" type="number" min="0" value="0" style="width:100px"></div>' +
+    '<div><label>Wyjechało</label><input id="pOut" type="number" min="0" value="0" style="width:100px"></div>' +
+    '<button onclick="save()">Zapisz</button></div>' +
+    '<table><thead><tr><th>Data</th><th class="num">Wjechało</th><th class="num">Wyjechało</th><th></th></tr></thead><tbody>' +
+    (data || []).map(r => '<tr><td>' + r.record_date + '</td><td class="num">' + r.palets_in + '</td><td class="num">' + r.palets_out + '</td><td class="num"><button class="sec" onclick="del(' + r.id + ')">Usuń</button></td></tr>').join('') +
+    '</tbody></table></div>';
+  $('pDate').value = new Date().toISOString().slice(0, 10);
+}
+async function save() {
+  const p = params();
+  const { error } = await sb.from('daily_records').upsert({ client_id: p.client, service_id: serviceId(PALLET_SERVICE), record_date: $('pDate').value, zone: '', palets_in: parseFloat($('pIn').value) || 0, palets_out: parseFloat($('pOut').value) || 0 }, { onConflict: 'client_id,service_id,record_date,zone' });
+  if (error) showMsg('Błąd zapisu: ' + error.message, true); else { await render(); showMsg('Zapisano.'); }
+}
+async function del(id) {
+  if (!confirm('Na pewno usunąć wpis?')) return;
+  const { error } = await sb.from('daily_records').delete().eq('id', id);
+  if (error) showMsg('Błąd: ' + error.message, true); else render();
+}
+</script></body></html>
