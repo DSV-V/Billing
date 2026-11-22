@@ -83,9 +83,11 @@ export default function InvoiceScreen({ invoiceId, clientId, role, onNav }: Prop
   const invCur = inv.invoice_currency;
 
   // Итог категории: NULL — курса нет; нет строки, но позиции есть — тоже курса нет; пустая категория — 0.
+  // Константа data уже без null: вложенная функция не наследует проверку `if (!d)`, поэтому берём её явно.
+  const data = d;
   function categoryTotal(cat: string): string {
-    const row = d.catTotals.find((c) => c.category === cat);
-    const hasPositions = d.positions.some((p) => p.category === cat);
+    const row = data.catTotals.find((c) => c.category === cat);
+    const hasPositions = data.positions.some((p) => p.category === cat);
     if (row) return money(row.total_amount) ?? 'Kurs niedostępny';
     if (hasPositions) return 'Kurs niedostępny';
     return money(0) ?? '0,00';
@@ -93,7 +95,7 @@ export default function InvoiceScreen({ invoiceId, clientId, role, onNav }: Prop
 
   function registerNotFilled(p: PositionRow): boolean {
     if (p.quantity_mode !== 'register' || !p.register_name) return false;
-    const reg = d!.registers.find((r) => r.register_name === p.register_name);
+    const reg = data.registers.find((r) => r.register_name === p.register_name);
     return reg ? !reg.is_filled : false;
   }
 
