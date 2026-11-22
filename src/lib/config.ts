@@ -10,5 +10,7 @@ export const SUPABASE_PUBLISHABLE_KEY: string =
 
 // Адрес, на который Supabase вернёт пользователя из письма сброса пароля.
 // Точный адрес нужно вписать в Supabase Auth (Site URL и Redirect URLs).
+// Domyślnie korzeń aplikacji (BASE_URL). Na GitHub Pages dodatkowa ścieżka dawałaby 404.
+// Aplikacja rozpoznaje powrót z linku po zdarzeniu PASSWORD_RECOVERY, więc ścieżka nie jest potrzebna.
 export const RESET_REDIRECT_URL: string =
-  env.VITE_RESET_REDIRECT_URL || `${window.location.origin}/nowe-haslo`;
+  env.VITE_RESET_REDIRECT_URL || new URL(env.BASE_URL, window.location.origin).href;
